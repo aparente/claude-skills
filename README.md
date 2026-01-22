@@ -22,6 +22,15 @@ Use for:
 - Reducing chartjunk and maximizing data-ink ratio
 - Planning small multiples and high-density displays
 
+### concert-playlist-builder
+
+Extract artists from concert/festival lineups and create playlists on Apple Music, YouTube, and Spotify.
+
+Use for:
+- Previewing music before attending a show
+- Creating playlists from RA, Songkick, Bandsintown, or any event page
+- Discovering artists from festival lineups
+
 ## License
 
 MIT
