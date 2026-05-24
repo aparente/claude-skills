@@ -2,7 +2,7 @@
 
 ## 1. Graphical Excellence
 
-Excellence in statistical graphics consists of complex ideas communicated with clarity, precision, and efficiency.
+A great statistical graphic lets complicated ideas come through plainly, precisely, and without waste.
 
 **Core qualities:**
 - Show the data
@@ -24,7 +24,7 @@ Excellence in statistical graphics consists of complex ideas communicated with c
 
 ## 2. Graphical Integrity
 
-Graphics must tell the truth about the data.
+A chart's visual claims must match what the underlying numbers actually say.
 
 **The Lie Factor:**
 ```
@@ -77,7 +77,7 @@ Data-Ink Ratio = Data-ink / Total ink used in graphic
 
 ## 4. Chartjunk
 
-Chartjunk is the interior decoration of graphics that does not convey information.
+Chartjunk is any visual element in a chart whose purpose is decorative rather than informational — ornament that adds texture without adding analytical content.
 
 **Three categories of chartjunk:**
 

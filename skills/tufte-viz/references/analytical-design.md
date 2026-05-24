@@ -8,23 +8,23 @@ Extends `tufte-principles.md` with material from *Envisioning Information* (1990
 
 From *Beautiful Evidence*. The most actionable framework Tufte produced — applies to any analytical presentation, not just charts.
 
-1. **Show comparisons, contrasts, differences**
+1. **Comparison first**
    The fundamental analytical act. Every display should answer "compared to what?"
 
-2. **Show causality, mechanism, structure, explanation**
-   Move beyond description. What's the *why* behind the pattern?
+2. **Reveal mechanism, not just outcome**
+   Move beyond description to causality, structure, explanation. What's the *why* behind the pattern?
 
-3. **Show multivariate data — more than 1 or 2 variables**
-   Real problems are multivariate. Reducing to a single variable hides interactions.
+3. **Embrace multivariate data**
+   Real problems involve more than one or two variables. Single-variable views hide interactions.
 
-4. **Completely integrate words, numbers, images, diagrams**
+4. **Interleave words, numbers, and images**
    Don't segregate by mode. Labels next to the data they describe; equations next to the curves they generate.
 
-5. **Thoroughly describe the evidence**
-   Provenance, authorship, scales, sources, measurements. Documentation enables trust.
+5. **Document the evidence**
+   Provenance, authorship, scales, sources, measurements. Trust requires traceability.
 
-6. **Analytical presentations ultimately stand or fall depending on the quality, relevance, and integrity of their content.**
-   No amount of design fixes weak evidence. Content is paramount.
+6. **Content quality decides everything**
+   No amount of design fixes weak evidence. Relevance and integrity of content matter more than every other principle combined.
 
 **Use in critique:** walk through all six. The lowest-scoring principle is usually the biggest improvement opportunity.
 
