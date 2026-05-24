@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>tufte-viz · demos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: Georgia, serif; max-width: 720px; margin: 60px auto; padding: 0 24px; color: #1a202c; line-height: 1.55; }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  .sub { color: #4a5568; font-size: 14px; margin-bottom: 40px; }
+  ul { list-style: none; padding: 0; }
+  li { margin-bottom: 28px; padding-bottom: 24px; border-bottom: 1px solid #e2e8f0; }
+  li:last-child { border-bottom: none; }
+  a { color: #1a202c; text-decoration: none; font-size: 17px; font-weight: 600; }
+  a:hover { text-decoration: underline; }
+  .desc { color: #4a5568; font-size: 13px; margin-top: 4px; font-style: italic; }
+  .footer { margin-top: 40px; font-size: 12px; color: #718096; }
+  code { font-family: SF Mono, Menlo, monospace; font-size: 12px; background: #f7fafc; padding: 2px 5px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h1>tufte-viz · pre/post demos</h1>
+<div class="sub">Four worked examples of how the <code>tufte-viz</code> skill changes a visualization. Each is a single page showing the default ("pre") and Tufte-treatment ("post") side by side.</div>
+
+<ul>
+  <li>
+    <a href="giss-temperature.html">NASA GISS temperature anomalies by latitude band, 1880–2025</a>
+    <div class="desc">Rainbow lines on a shared grid → small multiples with range frames, layered global-average underlay, direct labeling. Reveals polar amplification.</div>
+  </li>
+  <li>
+    <a href="kyoto-sakura.html">Kyoto cherry blossom full-bloom dates, 812–2015 CE</a>
+    <div class="desc">A connected line in noise → dot scatter with running median, inverted y-axis (warmer = up), climate-epoch bands. The modern warming signature emerges from 1,200 years of phenology.</div>
+  </li>
+  <li>
+    <a href="sunspot-butterfly.html">Royal Greenwich Observatory sunspot areas by latitude, 1874–2013</a>
+    <div class="desc">Five aggregated lines → Maunder butterfly heatmap. 93,000 data cells preserved; the migration pattern within each ~11-year cycle becomes visible.</div>
+  </li>
+  <li>
+    <a href="sunspot-pretty.html">Sunspots, austere vs beautiful (iridescent ridgeline)</a>
+    <div class="desc">Same data, two registers. Tufte-austere monochrome heatmap → iridescent blue ridgeline that preserves every Tufte invariant while gaining emotional reach.</div>
+  </li>
+</ul>
+
+<div class="footer">
+Skill source: <a href="../SKILL.md"><code>tufte-viz/SKILL.md</code></a> · references: <a href="../references/tufte-principles.md"><code>tufte-principles.md</code></a>, <a href="../references/analytical-design.md"><code>analytical-design.md</code></a>
+</div>
+</body>
+</html>

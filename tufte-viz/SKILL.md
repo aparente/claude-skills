@@ -35,7 +35,18 @@ Apply Edward Tufte's principles to design clear, honest, high-density data visua
    - Every element must earn its ink
    - Default to grayscale; use color purposefully
 
-4. **Apply the Tufte test** (see references/tufte-principles.md)
+4. **Apply the eraser test before shipping**
+   - For every element (label, tick, gridline, border, annotation): can it be erased without losing information that's not already conveyed elsewhere?
+   - Watch for duplicate encodings: numeric labels next to a value already marked by a tick; legends duplicating direct labels; per-panel scale annotations duplicating a shared-scale caption.
+   - If two elements compete for the same job, keep the visual one and drop the textual one (or vice versa) — not both.
+
+5. **Apply the collision test before shipping**
+   - For every text element in the plot (axis labels, point annotations, epoch labels, baseline labels, explanatory notes): mentally draw its bounding box. Does anything else — another text element, a data line, dense markers — live in or cross that box?
+   - The eraser test catches *redundant* elements; the collision test catches *crowded* ones. Both must pass.
+   - Standard fixes: move explanatory prose out of the plot into the figcaption; relocate band/epoch labels to a dedicated strip above the plot; push baseline/reference labels to the outside margin; give each in-plot annotation a leader line so the marker and the text occupy clearly separated space.
+   - Watch especially: inverted axes (top of plot is now where extreme values cluster, where annotations also want to go); shared-scale small multiples (labels stacked near zero in every panel); dense scatter (text vanishes into the dot cloud unless explicitly cleared).
+
+6. **Apply the Tufte test** (see references/tufte-principles.md)
 
 ### For critiquing visualizations:
 
@@ -58,13 +69,18 @@ Apply Edward Tufte's principles to design clear, honest, high-density data visua
 
 ## Key Principles Reference
 
-For detailed principles, read: `references/tufte-principles.md`
+- `references/tufte-principles.md` — core principles from *Visual Display of Quantitative Information*: lie factor, data-ink, chartjunk, small multiples, integrity.
+- `references/analytical-design.md` — extensions from *Envisioning Information*, *Visual Explanations*, and *Beautiful Evidence*: the 6 principles of analytical design, sparklines, layering & separation, micro/macro, range-frames, causality, confections. Load when designing dashboards, dense displays, sparklines, or explanatory graphics.
 
 **Quick checklist:**
 - [ ] Lie Factor ≈ 1.0 (no visual distortion)
 - [ ] Maximum data-ink ratio
 - [ ] Zero chartjunk
 - [ ] Clear labeling
-- [ ] Enables comparison
-- [ ] Reveals multiple levels of detail
+- [ ] Answers "compared to what?"
+- [ ] Shows causality or mechanism where relevant
+- [ ] Multivariate (not over-reduced)
+- [ ] Words, numbers, images integrated — not segregated
+- [ ] Reveals multiple levels of detail (micro + macro)
+- [ ] Layering: primary data dominates, secondary recedes
 - [ ] Appropriate data density
