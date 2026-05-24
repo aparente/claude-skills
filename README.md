@@ -43,6 +43,7 @@ See [`commands/README.md`](./commands/README.md) for the full list. Currently in
 
 - `/wrapup` — end-of-session git workflow (commit → review → cleanup → commit → push)
 - `/handoff [title]` — session continuity file generator
+- `/fight [target]` — dual-model red team (Claude vs Gemini adversarial review) — requires the `gemini` CLI
 
 ## License
 
