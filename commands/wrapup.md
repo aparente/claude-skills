@@ -112,33 +112,33 @@ $ARGUMENTS (optional): A hint for the commit message theme or scope.
 ## Example Flow
 
 ```
-User: /wrapup migration scripts
+User: /wrapup auth refactor
 
 Claude:
 🔒 Phase 0: Directory Verification
-✅ Confirmed: /Users/sublux/projects/my-app (git repo)
+✅ Confirmed: ~/code/my-app (git repo)
    Branch: main
 
 📋 Phase 1: Git Status
-- Modified: scripts/migrate_person.py
-- Modified: scripts/fix_person_yaml.py
-- New: _fileClasses/Person.md
+- Modified: src/auth/session.ts
+- Modified: src/auth/handler.ts
+- New:      src/auth/types.ts
 
 📝 Phase 2: Save Work
 Committing:
-"feat: add Person migration and YAML fix scripts
+"feat: extract session and types modules from auth handler
 
-Migrate 615 People notes to new roles schema with verification.
-Add fileClass property and fix null values in frontmatter."
+Split session lifecycle and shared types out of handler.ts to
+clarify responsibilities and prepare for upcoming MFA work."
 
-✅ Work saved in commit abc1234 - this is your safety checkpoint.
+✅ Work saved in commit abc1234 — this is your safety checkpoint.
 
 🔍 Phase 3: Code Review
 Reviewing committed files for cleanup opportunities...
 
 Found 2 issues:
-- scripts/migrate_person.py:45 - debug print statement
-- scripts/fix_person_yaml.py:12 - commented-out code block
+- src/auth/session.ts:45 — debug console.log statement
+- src/auth/handler.ts:12 — commented-out code block
 
 Your work is safe in the previous commit. Fix these in a cleanup commit? [yes/no]
 
@@ -148,8 +148,8 @@ Claude: ✅ Cleanup committed: def5678
 
 🚀 Phase 4: Push
 Pushing to origin/main (2 commits ahead):
-  - abc1234: feat: add Person migration and YAML fix scripts
-  - def5678: chore: remove debug statements
+  - abc1234: feat: extract session and types modules from auth handler
+  - def5678: chore: remove debug logging and dead code
 
 ✅ Pushed to origin/main
 

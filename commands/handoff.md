@@ -98,15 +98,15 @@ $ARGUMENTS: A brief title or summary for the handoff (used in filename). If not 
 
 ## Example
 
-User runs: `/handoff metadata menu setup`
+User runs (from a project working directory called `my-app`): `/handoff auth refactor`
 
-Creates: `~/.claude/handoffs/BioBrain_Rebuild/2026-01-04-143022_metadata-menu-setup.md`
+Creates: `~/.claude/handoffs/my-app/2026-01-04-143022_auth-refactor.md`
 
 ## Notes
 
-- This command works for **any project** - it's not specific to any codebase
+- This command works for **any project** — it's not specific to any codebase
 - Handoff files are stored globally in `~/.claude/handoffs/` organized by project
-- Files are searchable via episodic memory in future sessions
+- If the `episodic-memory` plugin is installed, handoff files become searchable across future sessions
 - Keep the summary concise but capture enough context for continuity
-- The transcript reference links to the full conversation JSONL file for deep-dive debugging
-- If the transcript path cannot be verified, still include it with a note that it may not exist yet (archived after session ends)
+- The transcript reference (if a path was found in step 2) links to the conversation JSONL for deep-dive debugging
+- If no transcript path was found, omit the transcript reference section rather than including a broken or speculative path
