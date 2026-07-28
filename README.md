@@ -8,9 +8,10 @@ Live demo gallery: **https://aparente.github.io/claude-skills/**
 
 ```
 claude-skills/
-├── skills/      # auto-triggered skills — install to ~/.claude/skills/
-├── commands/    # slash commands — install to ~/.claude/commands/
-└── index.html   # Pages landing
+├── skills/         # auto-triggered skills — install to ~/.claude/skills/
+├── commands/       # slash commands — install to ~/.claude/commands/
+├── output-styles/  # output styles — install to ~/.claude/output-styles/
+└── index.html      # Pages landing
 ```
 
 ## Installation
@@ -21,7 +22,12 @@ cp -r skills/<skill-name> ~/.claude/skills/
 
 # Commands
 cp commands/<command-name>.md ~/.claude/commands/
+
+# Output styles
+cp output-styles/<style-name>.md ~/.claude/output-styles/
 ```
+
+Activate an output style from `/config` > Output Style.
 
 ## Skills
 
@@ -44,6 +50,12 @@ See [`commands/README.md`](./commands/README.md) for the full list. Currently in
 - `/wrapup` — end-of-session git workflow (commit → review → cleanup → commit → push)
 - `/handoff [title]` — session continuity file generator
 - `/fight [target]` — dual-model red team (Claude vs Gemini adversarial review) — requires the `gemini` CLI
+
+## Output Styles
+
+### adhd-comms
+
+Action-first, scannable output. Answers lead with the point, steps are numbered, and filler is cut. Combines plain-language communication rules with ADHD-friendly formatting (5-15 minute task chunks, one recommendation, checklists over paragraphs). Activate from `/config` > Output Style.
 
 ## License
 
