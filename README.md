@@ -43,13 +43,21 @@ Stanford d.school design thinking facilitator. Runs full design sprints across a
 
 Extract artists from concert/festival lineups and create playlists on Apple Music, YouTube, and Spotify. Works with RA (Resident Advisor), Songkick, Bandsintown, or any event page.
 
+### google-ai-mode
+
+Query Google's AI Search mode for synthesized answers with source citations from across the web. Returns markdown with footnoted references. Useful for current information and research beyond the model's knowledge cutoff. Ships with a Python runner and browser setup scripts.
+
+### i-have-adhd
+
+Reshape output for ADHD readers: lead with the answer, number the steps, cut preamble and filler. Adapted from [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd).
+
 ## Commands
 
 See [`commands/README.md`](./commands/README.md) for the full list. Currently includes:
 
 - `/wrapup` — end-of-session git workflow (commit → review → cleanup → commit → push)
 - `/handoff [title]` — session continuity file generator
-- `/fight [target]` — dual-model red team (Claude vs Gemini adversarial review) — requires the `gemini` CLI
+- `/fight [target]` — dual-model red team (Claude vs Codex GPT-5.6 Sol adversarial review) — requires the Codex plugin
 
 ## Output Styles
 
