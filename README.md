@@ -11,6 +11,7 @@ claude-skills/
 ├── skills/         # auto-triggered skills — install to ~/.claude/skills/
 ├── commands/       # slash commands — install to ~/.claude/commands/
 ├── output-styles/  # output styles — install to ~/.claude/output-styles/
+├── mcp-servers/    # MCP servers — build and register in .mcp.json
 └── index.html      # Pages landing
 ```
 
@@ -58,6 +59,12 @@ See [`commands/README.md`](./commands/README.md) for the full list. Currently in
 - `/wrapup` — end-of-session git workflow (commit → review → cleanup → commit → push)
 - `/handoff [title]` — session continuity file generator
 - `/fight [target]` — dual-model red team (Claude vs Codex GPT-5.6 Sol adversarial review) — requires the Codex plugin
+
+## MCP Servers
+
+### resident-advisor-mcp-server
+
+Find electronic music events on [Resident Advisor](https://ra.co) through its GraphQL API. Seven read-only tools: area lookup, event listings with genre filter and popularity sort, event details, global search, artist profiles, venue details, and genre list. No API key needed. See [`mcp-servers/resident-advisor-mcp-server/README.md`](./mcp-servers/resident-advisor-mcp-server/README.md) for setup.
 
 ## Output Styles
 

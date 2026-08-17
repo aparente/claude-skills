@@ -1,0 +1,792 @@
+#!/usr/bin/env node
+/**
+ * MCP server for Resident Advisor (ra.co).
+ *
+ * Discovers electronic music events, artists, venues, and genres via the
+ * public GraphQL API that powers the ra.co website. Read-only; no auth.
+ */
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+
+import { errorText, raQuery, raUrl } from "./client.js";
+import {
+  enforceCharacterLimit,
+  eventSummaryJson,
+  eventSummaryMarkdown,
+  formatDateTime,
+} from "./format.js";
+import {
+  AREAS_QUERY,
+  ARTIST_QUERY,
+  EVENT_DETAIL_QUERY,
+  EVENT_LISTINGS_QUERY,
+  GENRES_QUERY,
+  SEARCH_QUERY,
+  VENUE_QUERY,
+} from "./queries.js";
+import type {
+  RaArea,
+  RaArtistDetail,
+  RaEventDetail,
+  RaEventListingsData,
+  RaGenre,
+  RaSearchResult,
+  RaVenueDetail,
+} from "./types.js";
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+enum ResponseFormat {
+  MARKDOWN = "markdown",
+  JSON = "json",
+}
+
+const responseFormatField = z
+  .nativeEnum(ResponseFormat)
+  .default(ResponseFormat.MARKDOWN)
+  .describe(
+    "Output format: 'markdown' for human-readable, 'json' for machine-readable",
+  );
+
+const server = new McpServer({
+  name: "resident-advisor-mcp-server",
+  version: "1.0.0",
+});
+
+/** Wrap a tool handler so any thrown error becomes a clean error response. */
+function safe<TParams>(
+  handler: (params: TParams) => Promise<{
+    content: { type: "text"; text: string }[];
+    structuredContent?: Record<string, unknown>;
+  }>,
+) {
+  return async (params: TParams) => {
+    try {
+      return await handler(params);
+    } catch (error) {
+      return {
+        content: [{ type: "text" as const, text: errorText(error) }],
+        isError: true,
+      };
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------
+// ra_search_areas
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  "ra_search_areas",
+  {
+    title: "Search RA Areas (Cities/Regions)",
+    description: `Find Resident Advisor area IDs by city or region name. An area ID is required by ra_find_events, so call this first when you only know a city name.
+
+Args:
+  - query (string): City or region name, e.g. "Berlin", "New York", "Tokyo"
+  - limit (number): Max results, 1-20 (default: 5)
+
+Returns: Matching areas with numeric id, name, URL slug, and country.
+
+Example: query="Berlin" -> [{id: 34, name: "Berlin", country: "Germany"}]`,
+    inputSchema: {
+      query: z
+        .string()
+        .min(1)
+        .max(100)
+        .describe("City or region name to search for"),
+      limit: z.number().int().min(1).max(20).default(5),
+      response_format: responseFormatField,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  safe(async (params: { query: string; limit: number; response_format: ResponseFormat }) => {
+    const data = await raQuery<{ areas: RaArea[] }>(AREAS_QUERY, {
+      searchTerm: params.query,
+      limit: params.limit,
+    });
+    const areas = data.areas ?? [];
+
+    const output = {
+      count: areas.length,
+      areas: areas.map((a) => ({
+        id: Number(a.id),
+        name: a.name,
+        url_name: a.urlName,
+        country: a.country?.name ?? null,
+        country_code: a.country?.urlCode ?? null,
+      })),
+    };
+
+    if (areas.length === 0) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `No RA areas found matching '${params.query}'. Try a broader city name or the nearest major city.`,
+          },
+        ],
+        structuredContent: output,
+      };
+    }
+
+    let text: string;
+    if (params.response_format === ResponseFormat.MARKDOWN) {
+      const lines = [`# RA Areas matching '${params.query}'`, ""];
+      for (const a of output.areas) {
+        lines.push(
+          `- **${a.name}**, ${a.country ?? "unknown country"} — area ID \`${a.id}\``,
+        );
+      }
+      text = lines.join("\n");
+    } else {
+      text = JSON.stringify(output, null, 2);
+    }
+
+    return {
+      content: [{ type: "text" as const, text }],
+      structuredContent: output,
+    };
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// ra_find_events
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  "ra_find_events",
+  {
+    title: "Find RA Events",
+    description: `Find electronic music events listed on Resident Advisor for an area and date range. This is the main event-discovery tool.
+
+Args:
+  - area (number): RA area ID (get it from ra_search_areas, e.g. Berlin=34, London=13, New York=8)
+  - start_date (string): First listing date, YYYY-MM-DD
+  - end_date (string): Last listing date, YYYY-MM-DD (inclusive)
+  - genre (string, optional): Genre slug filter, e.g. "techno", "house", "drumandbass" (see ra_list_genres)
+  - sort (string): "date" (chronological, default) or "popularity" (most interested first)
+  - page (number): Page number, starts at 1 (default: 1)
+  - page_size (number): Events per page, 1-50 (default: 20)
+
+Returns: total_results plus a page of events, each with id, title, times, venue, lineup, genres, interested count, and ra.co URL. Use the event id with ra_get_event for full details.
+
+Examples:
+  - "What's on in Berlin this weekend?" -> area=34, start_date/end_date spanning the weekend
+  - "Biggest techno night in London in September" -> area=13, genre="techno", sort="popularity"`,
+    inputSchema: {
+      area: z.number().int().positive().describe("RA area ID from ra_search_areas"),
+      start_date: z
+        .string()
+        .regex(DATE_PATTERN, "Use YYYY-MM-DD format")
+        .describe("First listing date, YYYY-MM-DD"),
+      end_date: z
+        .string()
+        .regex(DATE_PATTERN, "Use YYYY-MM-DD format")
+        .describe("Last listing date (inclusive), YYYY-MM-DD"),
+      genre: z
+        .string()
+        .max(50)
+        .optional()
+        .describe("Genre slug, e.g. 'techno' (see ra_list_genres)"),
+      sort: z.enum(["date", "popularity"]).default("date"),
+      page: z.number().int().min(1).default(1),
+      page_size: z.number().int().min(1).max(50).default(20),
+      response_format: responseFormatField,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  safe(
+    async (params: {
+      area: number;
+      start_date: string;
+      end_date: string;
+      genre?: string;
+      sort: "date" | "popularity";
+      page: number;
+      page_size: number;
+      response_format: ResponseFormat;
+    }) => {
+      if (params.end_date < params.start_date) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: end_date is before start_date. Swap them and retry.",
+            },
+          ],
+        };
+      }
+
+      const filters: Record<string, unknown> = {
+        areas: { eq: params.area },
+        listingDate: { gte: params.start_date, lte: params.end_date },
+      };
+      if (params.genre) {
+        filters.genre = { eq: params.genre.toLowerCase() };
+      }
+
+      const sort =
+        params.sort === "popularity"
+          ? { attending: { order: "DESCENDING" } }
+          : { listingDate: { order: "ASCENDING" } };
+
+      const data = await raQuery<RaEventListingsData>(EVENT_LISTINGS_QUERY, {
+        filters,
+        page: params.page,
+        pageSize: params.page_size,
+        sort,
+      });
+
+      const listings = data.eventListings.data.filter((l) => l.event !== null);
+      const total = data.eventListings.totalResults;
+      const hasMore = total > params.page * params.page_size;
+
+      const output = {
+        total_results: total,
+        count: listings.length,
+        page: params.page,
+        page_size: params.page_size,
+        has_more: hasMore,
+        ...(hasMore ? { next_page: params.page + 1 } : {}),
+        events: listings
+          .map(eventSummaryJson)
+          .filter((e): e is object => e !== null),
+      };
+
+      if (listings.length === 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `No events found for area ${params.area} between ${params.start_date} and ${params.end_date}${params.genre ? ` with genre '${params.genre}'` : ""}. Widen the date range, drop the genre filter, or verify the area ID with ra_search_areas.`,
+            },
+          ],
+          structuredContent: output,
+        };
+      }
+
+      let text: string;
+      if (params.response_format === ResponseFormat.MARKDOWN) {
+        const lines = [
+          `# RA Events: area ${params.area}, ${params.start_date} to ${params.end_date}`,
+          "",
+          `Found ${total} events (showing ${listings.length}, page ${params.page}${hasMore ? `; more available on page ${params.page + 1}` : ""})`,
+          "",
+        ];
+        for (const listing of listings) {
+          if (!listing.event) continue;
+          lines.push(...eventSummaryMarkdown(listing.event), "");
+        }
+        text = enforceCharacterLimit(
+          lines.join("\n"),
+          "Reduce page_size or add a genre filter to see fewer events per page.",
+        );
+      } else {
+        text = enforceCharacterLimit(
+          JSON.stringify(output, null, 2),
+          "Reduce page_size or add a genre filter.",
+        );
+      }
+
+      return {
+        content: [{ type: "text" as const, text }],
+        structuredContent: output,
+      };
+    },
+  ),
+);
+
+// ---------------------------------------------------------------------------
+// ra_get_event
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  "ra_get_event",
+  {
+    title: "Get RA Event Details",
+    description: `Get full details for one Resident Advisor event by its numeric ID (from ra_find_events, ra_search, or an ra.co/events/<id> URL).
+
+Args:
+  - event_id (number): RA event ID, e.g. 2507884
+
+Returns: Title, description, dates/times, cost, minimum age, full lineup with artist IDs, venue with address, promoters, genres, interested count, flyer image URL, and ra.co URL.`,
+    inputSchema: {
+      event_id: z.number().int().positive().describe("RA event ID"),
+      response_format: responseFormatField,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  safe(async (params: { event_id: number; response_format: ResponseFormat }) => {
+    const data = await raQuery<{ event: RaEventDetail | null }>(
+      EVENT_DETAIL_QUERY,
+      { id: params.event_id },
+    );
+    const event = data.event;
+    if (!event) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: No event found with ID ${params.event_id}. Check the ID (the number in ra.co/events/<id>).`,
+          },
+        ],
+      };
+    }
+
+    const output = {
+      id: event.id,
+      title: event.title,
+      description: event.content || null,
+      start_time: event.startTime,
+      end_time: event.endTime,
+      cost: event.cost || null,
+      minimum_age: event.minimumAge,
+      is_ticketed: event.isTicketed ?? false,
+      is_festival: event.isFestival ?? false,
+      interested_count: event.attending,
+      genres: (event.genres ?? []).map((g) => g.name),
+      lineup: (event.artists ?? []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        url: raUrl(a.contentUrl),
+      })),
+      venue: event.venue
+        ? {
+            id: event.venue.id,
+            name: event.venue.name,
+            address: event.venue.address,
+            area: event.venue.area?.name ?? null,
+            country: event.venue.area?.country?.name ?? null,
+            url: raUrl(event.venue.contentUrl),
+          }
+        : null,
+      promoters: (event.promoters ?? []).map((p) => p.name),
+      flyer_url: event.flyerFront || null,
+      url: raUrl(event.contentUrl),
+    };
+
+    let text: string;
+    if (params.response_format === ResponseFormat.MARKDOWN) {
+      const lines = [`# ${event.title}`, ""];
+      lines.push(
+        `- **When**: ${formatDateTime(event.startTime)} → ${formatDateTime(event.endTime)}`,
+      );
+      if (output.venue) {
+        lines.push(
+          `- **Venue**: ${output.venue.name}${output.venue.address ? `, ${output.venue.address}` : ""} (${[output.venue.area, output.venue.country].filter(Boolean).join(", ")})`,
+        );
+      }
+      if (output.cost) lines.push(`- **Cost**: ${output.cost}`);
+      if (output.minimum_age) lines.push(`- **Minimum age**: ${output.minimum_age}`);
+      if (output.genres.length > 0)
+        lines.push(`- **Genres**: ${output.genres.join(", ")}`);
+      lines.push(`- **Interested**: ${output.interested_count}`);
+      if (output.promoters.length > 0)
+        lines.push(`- **Promoters**: ${output.promoters.join(", ")}`);
+      if (output.url) lines.push(`- **URL**: ${output.url}`);
+      if (output.lineup.length > 0) {
+        lines.push("", "## Lineup");
+        for (const artist of output.lineup) {
+          lines.push(`- ${artist.name} (artist ${artist.id})`);
+        }
+      }
+      if (output.description) {
+        lines.push("", "## Description", output.description);
+      }
+      text = enforceCharacterLimit(
+        lines.join("\n"),
+        "The event description was very long.",
+      );
+    } else {
+      text = JSON.stringify(output, null, 2);
+    }
+
+    return {
+      content: [{ type: "text" as const, text }],
+      structuredContent: output,
+    };
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// ra_search
+// ---------------------------------------------------------------------------
+
+const SEARCH_INDICES = [
+  "EVENT",
+  "ARTIST",
+  "CLUB",
+  "PROMOTER",
+  "LABEL",
+  "AREA",
+] as const;
+
+server.registerTool(
+  "ra_search",
+  {
+    title: "Search Resident Advisor",
+    description: `Global keyword search across Resident Advisor: events, artists, clubs/venues, promoters, labels, and areas. Use this to resolve a name ("Berghain", "Ellen Allien", "Dekmantel") to RA IDs and URLs.
+
+Args:
+  - query (string): Search term
+  - types (string[], optional): Restrict to result types, any of EVENT, ARTIST, CLUB, PROMOTER, LABEL, AREA (default: all)
+  - limit (number): Max results, 1-30 (default: 10)
+
+Returns: Results with type, id, name, location, and ra.co URL. CLUB results are venues usable with ra_get_venue; ARTIST results work with ra_get_artist; EVENT results work with ra_get_event.`,
+    inputSchema: {
+      query: z.string().min(1).max(200).describe("Search term"),
+      types: z
+        .array(z.enum(SEARCH_INDICES))
+        .optional()
+        .describe("Result types to include (default: all)"),
+      limit: z.number().int().min(1).max(30).default(10),
+      response_format: responseFormatField,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  safe(
+    async (params: {
+      query: string;
+      types?: (typeof SEARCH_INDICES)[number][];
+      limit: number;
+      response_format: ResponseFormat;
+    }) => {
+      const data = await raQuery<{ search: RaSearchResult[] }>(SEARCH_QUERY, {
+        searchTerm: params.query,
+        limit: params.limit,
+        indices: params.types ?? [...SEARCH_INDICES],
+      });
+      const results = data.search ?? [];
+
+      const output = {
+        count: results.length,
+        results: results.map((r) => ({
+          type: r.searchType,
+          id: r.id,
+          name: r.value,
+          area: r.areaName,
+          country: r.countryName,
+          url: raUrl(r.contentUrl),
+        })),
+      };
+
+      if (results.length === 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `No RA results for '${params.query}'. Try a shorter or differently spelled term.`,
+            },
+          ],
+          structuredContent: output,
+        };
+      }
+
+      let text: string;
+      if (params.response_format === ResponseFormat.MARKDOWN) {
+        const lines = [`# RA Search: '${params.query}'`, ""];
+        for (const r of output.results) {
+          const location = [r.area, r.country].filter(Boolean).join(", ");
+          lines.push(
+            `- **${r.name}** [${r.type}, id ${r.id}]${location ? ` — ${location}` : ""}${r.url ? ` — ${r.url}` : ""}`,
+          );
+        }
+        text = lines.join("\n");
+      } else {
+        text = JSON.stringify(output, null, 2);
+      }
+
+      return {
+        content: [{ type: "text" as const, text }],
+        structuredContent: output,
+      };
+    },
+  ),
+);
+
+// ---------------------------------------------------------------------------
+// ra_get_artist
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  "ra_get_artist",
+  {
+    title: "Get RA Artist Profile",
+    description: `Get a Resident Advisor artist profile by numeric ID or URL slug.
+
+Args:
+  - artist_id (number, optional): RA artist ID (from ra_search or event lineups)
+  - slug (string, optional): URL slug from ra.co/dj/<slug>, e.g. "ellenallien"
+  Provide exactly one of artist_id or slug.
+
+Returns: Name, follower count, country, bio blurb, social/web links, and ra.co URL.`,
+    inputSchema: {
+      artist_id: z.number().int().positive().optional().describe("RA artist ID"),
+      slug: z
+        .string()
+        .max(100)
+        .optional()
+        .describe("Artist URL slug from ra.co/dj/<slug>"),
+      response_format: responseFormatField,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  safe(
+    async (params: {
+      artist_id?: number;
+      slug?: string;
+      response_format: ResponseFormat;
+    }) => {
+      if (!params.artist_id && !params.slug) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: Provide either artist_id or slug.",
+            },
+          ],
+        };
+      }
+
+      const data = await raQuery<{ artist: RaArtistDetail | null }>(
+        ARTIST_QUERY,
+        params.artist_id ? { id: params.artist_id } : { slug: params.slug },
+      );
+      const artist = data.artist;
+      if (!artist) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: No artist found for ${params.artist_id ? `ID ${params.artist_id}` : `slug '${params.slug}'`}. Try ra_search with the artist name.`,
+            },
+          ],
+        };
+      }
+
+      const links: Record<string, string | null> = {
+        soundcloud: artist.soundcloud,
+        instagram: artist.instagram,
+        twitter: artist.twitter,
+        facebook: artist.facebook,
+        website: artist.website,
+      };
+
+      const output = {
+        id: artist.id,
+        name: artist.name,
+        follower_count: artist.followerCount,
+        country: artist.country?.name ?? null,
+        bio: artist.biography?.blurb || null,
+        links: Object.fromEntries(
+          Object.entries(links).filter(([, v]) => Boolean(v)),
+        ),
+        url: raUrl(artist.contentUrl),
+      };
+
+      let text: string;
+      if (params.response_format === ResponseFormat.MARKDOWN) {
+        const lines = [`# ${artist.name} (artist ${artist.id})`, ""];
+        if (output.country) lines.push(`- **Country**: ${output.country}`);
+        if (output.follower_count !== null)
+          lines.push(`- **RA followers**: ${output.follower_count}`);
+        if (output.url) lines.push(`- **URL**: ${output.url}`);
+        for (const [name, url] of Object.entries(output.links)) {
+          lines.push(`- **${name[0].toUpperCase()}${name.slice(1)}**: ${url}`);
+        }
+        if (output.bio) lines.push("", "## Bio", output.bio);
+        text = lines.join("\n");
+      } else {
+        text = JSON.stringify(output, null, 2);
+      }
+
+      return {
+        content: [{ type: "text" as const, text }],
+        structuredContent: output,
+      };
+    },
+  ),
+);
+
+// ---------------------------------------------------------------------------
+// ra_get_venue
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  "ra_get_venue",
+  {
+    title: "Get RA Venue Details",
+    description: `Get details for a club/venue on Resident Advisor by numeric ID (from ra_search CLUB results, event listings, or an ra.co/clubs/<id> URL).
+
+Args:
+  - venue_id (number): RA venue ID, e.g. 185172
+
+Returns: Name, address, area/country, description, capacity, follower count, website/phone, events this year, most-booked artists, and ra.co URL.`,
+    inputSchema: {
+      venue_id: z.number().int().positive().describe("RA venue ID"),
+      response_format: responseFormatField,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  safe(async (params: { venue_id: number; response_format: ResponseFormat }) => {
+    const data = await raQuery<{ venue: RaVenueDetail | null }>(VENUE_QUERY, {
+      id: params.venue_id,
+    });
+    const venue = data.venue;
+    if (!venue) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: No venue found with ID ${params.venue_id}. Check the ID (the number in ra.co/clubs/<id>), or find it via ra_search with types=["CLUB"].`,
+          },
+        ],
+      };
+    }
+
+    const output = {
+      id: venue.id,
+      name: venue.name,
+      address: venue.address || null,
+      area: venue.area?.name ?? null,
+      country: venue.area?.country?.name ?? null,
+      area_id: venue.area ? Number(venue.area.id) : null,
+      description: venue.blurb || null,
+      capacity:
+        venue.capacity && venue.capacity !== "0" ? venue.capacity : null,
+      follower_count: venue.followerCount,
+      website: venue.website || null,
+      phone: venue.phone || null,
+      event_count_this_year: venue.eventCountThisYear,
+      top_artists: (venue.topArtists ?? []).map((a) => a.name),
+      url: raUrl(venue.contentUrl),
+    };
+
+    let text: string;
+    if (params.response_format === ResponseFormat.MARKDOWN) {
+      const lines = [`# ${venue.name} (venue ${venue.id})`, ""];
+      if (output.address) lines.push(`- **Address**: ${output.address}`);
+      const location = [output.area, output.country].filter(Boolean).join(", ");
+      if (location)
+        lines.push(`- **Location**: ${location} (area ID ${output.area_id})`);
+      if (output.capacity) lines.push(`- **Capacity**: ${output.capacity}`);
+      if (output.follower_count !== null)
+        lines.push(`- **RA followers**: ${output.follower_count}`);
+      if (output.event_count_this_year !== null)
+        lines.push(`- **Events this year**: ${output.event_count_this_year}`);
+      if (output.website) lines.push(`- **Website**: ${output.website}`);
+      if (output.url) lines.push(`- **URL**: ${output.url}`);
+      if (output.top_artists.length > 0)
+        lines.push(`- **Most booked artists**: ${output.top_artists.join(", ")}`);
+      if (output.description) lines.push("", "## About", output.description);
+      text = lines.join("\n");
+    } else {
+      text = JSON.stringify(output, null, 2);
+    }
+
+    return {
+      content: [{ type: "text" as const, text }],
+      structuredContent: output,
+    };
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// ra_list_genres
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  "ra_list_genres",
+  {
+    title: "List RA Genres",
+    description: `List all genres known to Resident Advisor with the slug values accepted by ra_find_events' genre filter.
+
+Args: none (response_format only)
+
+Returns: All genres with name and slug (e.g. name "Drum & Bass" -> slug "drumandbass").`,
+    inputSchema: {
+      response_format: responseFormatField,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  safe(async (params: { response_format: ResponseFormat }) => {
+    const data = await raQuery<{ genres: RaGenre[] }>(GENRES_QUERY);
+    const genres = (data.genres ?? []).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+
+    const output = {
+      count: genres.length,
+      genres: genres.map((g) => ({ name: g.name, slug: g.slug })),
+    };
+
+    let text: string;
+    if (params.response_format === ResponseFormat.MARKDOWN) {
+      const lines = [`# RA Genres (${genres.length})`, ""];
+      for (const g of genres) {
+        lines.push(`- ${g.name} — slug \`${g.slug}\``);
+      }
+      text = lines.join("\n");
+    } else {
+      text = JSON.stringify(output, null, 2);
+    }
+
+    return {
+      content: [{ type: "text" as const, text }],
+      structuredContent: output,
+    };
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
+
+async function main(): Promise<void> {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("resident-advisor-mcp-server running on stdio");
+}
+
+main().catch((error) => {
+  console.error("Fatal server error:", error);
+  process.exit(1);
+});
