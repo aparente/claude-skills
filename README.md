@@ -64,7 +64,7 @@ See [`commands/README.md`](./commands/README.md) for the full list. Currently in
 
 ### resident-advisor-mcp-server
 
-Find electronic music events on [Resident Advisor](https://ra.co) through its GraphQL API. Seven read-only tools: area lookup, event listings with genre filter and popularity sort, event details, global search, artist profiles, venue details, and genre list. No API key needed. See [`mcp-servers/resident-advisor-mcp-server/README.md`](./mcp-servers/resident-advisor-mcp-server/README.md) for setup.
+Find electronic music events on [Resident Advisor](https://ra.co) through its GraphQL API. Nine read-only tools: area lookup, event listings with genre filter and popularity sort, event details, global search, artist profiles, venue details, genre list, plus the `search`/`fetch` pair OpenAI requires for ChatGPT connectors. Runs over stdio (Claude) or streamable HTTP (OpenAI). No API key needed. See [`mcp-servers/resident-advisor-mcp-server/README.md`](./mcp-servers/resident-advisor-mcp-server/README.md) for setup.
 
 ## Output Styles
 

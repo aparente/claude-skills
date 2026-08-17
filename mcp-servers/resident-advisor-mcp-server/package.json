@@ -1,6 +1,6 @@
 {
   "name": "resident-advisor-mcp-server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MCP server for discovering electronic music events on Resident Advisor (ra.co)",
   "type": "module",
   "main": "dist/index.js",

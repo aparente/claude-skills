@@ -164,6 +164,19 @@ query VenueDetail($id: ID) {
   }
 }`;
 
+export const AREAS_BY_ID_QUERY = `
+query AreasById($ids: [ID]) {
+  areas(ids: $ids) {
+    id
+    name
+    urlName
+    country {
+      name
+      urlCode
+    }
+  }
+}`;
+
 export const GENRES_QUERY = `
 query Genres {
   genres {
