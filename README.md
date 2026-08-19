@@ -54,7 +54,7 @@ Reshape output for ADHD readers: lead with the answer, number the steps, cut pre
 
 ### humanizer
 
-Remove signs of AI-generated writing so text reads as human. Covers 25 patterns: inflated significance, promotional language, rule-of-three padding, em-dash overuse, AI vocabulary (including "load-bearing" and "seam"), paraprosdokians, and more. Scoped to human-facing copy, not agent instructions. Forked from [blader/humanizer](https://github.com/blader/humanizer) with added rules.
+Remove signs of AI-generated writing so text reads as human. Covers 36 patterns: inflated significance, promotional language, rule-of-three padding, em-dash overuse, AI vocabulary (including "load-bearing" and "seam"), paraprosdokians, and more. Scoped to human-facing copy, not agent instructions. Forked from [blader/humanizer](https://github.com/blader/humanizer) (MIT) at v2.11.1, with added rules.
 
 ## Commands
 
