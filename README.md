@@ -52,6 +52,10 @@ Query Google's AI Search mode for synthesized answers with source citations from
 
 Reshape output for ADHD readers: lead with the answer, number the steps, cut preamble and filler. Adapted from [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd).
 
+### humanizer
+
+Remove signs of AI-generated writing so text reads as human. Covers 25 patterns: inflated significance, promotional language, rule-of-three padding, em-dash overuse, AI vocabulary (including "load-bearing" and "seam"), paraprosdokians, and more. Scoped to human-facing copy, not agent instructions. Forked from [blader/humanizer](https://github.com/blader/humanizer) with added rules.
+
 ## Commands
 
 See [`commands/README.md`](./commands/README.md) for the full list. Currently includes:
